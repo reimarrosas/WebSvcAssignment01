@@ -78,6 +78,7 @@ $app->get('/artists/{artist_id}/albums/{album_id}/tracks', function (Request $re
         throw new HttpBadRequestException($req, 'Invalid album_id parameter!');
     }
 
+    // Check if genre or mediaType query param exists
     $genre = array_key_exists('genre', $query_params) ? $query_params['genre'] : false;
     $media_type = array_key_exists('mediaType', $query_params) ? $query_params['mediaType'] : false;
 
@@ -88,6 +89,8 @@ $app->get('/artists/{artist_id}/albums/{album_id}/tracks', function (Request $re
     $types = 'ii';
     $params = [$artist_id, $album_id];
 
+    // If genre or mediaType query param exists, add filter to the WHERE
+    // clause of the query
     if ($genre) {
         $where .= ' AND g.Name = ?';
         $types .= 's';
@@ -111,7 +114,7 @@ $app->get('/artists/{artist_id}/albums/{album_id}/tracks', function (Request $re
 });
 
 /**
- * Utility function for checking if a POST body is a valid artist
+ * Utility function for checking if a POST body is a valid new artist
  */
 $isNewArtistValid = function (array|null $artist) {
     return !empty($artist) && !empty($artist['name']) &&
@@ -135,6 +138,10 @@ function isAssoc(array|null $arr)
     return !empty($arr) && array_keys($arr) == range(0, count($arr) - 1);
 }
 
+/**
+ * Utility function for checking if the request body is valid based on the
+ * passed validator
+ */
 function parseArtistBody(array|null $body, callable $validator)
 {
     $ret = [];
@@ -162,10 +169,12 @@ $app->post('/artists', function (Request $req, Response $res, $args) use ($db, $
         throw new HttpBadRequestException($req, 'Invalid New Artist(s)!');
     }
 
+    // Since DB doesn't use autoincrement, need to get the last ArtistId
     $finalId = intval($db->query('SELECT MAX(ArtistId) as FinalId FROM artist')->fetch_column());
     $types = '';
     $params = '';
 
+    // add a SQL query type and param per artist POSTed in the body
     foreach ($parsedBody as $key => $_) {
         $id = $finalId + $key + 1;
         $types .= 's';
@@ -177,6 +186,7 @@ $app->post('/artists', function (Request $req, Response $res, $args) use ($db, $
     }
 
     $stmt = $db->prepare("INSERT INTO artist (ArtistId, Name) VALUES $params");
+    // Unwrapping the associative array to just be an array of strings
     $stmt->bind_param($types, ...(array_map(fn ($item) => $item['name'], $parsedBody)));
     if (!$stmt->execute()) {
         throw new HttpInternalServerErrorException($req, 'Something broke!');
@@ -203,6 +213,8 @@ $app->put('/artists', function (Request $req, Response $res, $args) use ($db, $i
     $stmt = $db->prepare('UPDATE artist SET Name = ? WHERE ArtistId = ?');
     $stmt->bind_param('si', $name, $id);
 
+    // Uses a prepared statement to update multiple artists based on the body of
+    // the request
     $db->begin_transaction();
     foreach ($parsedBody as $artist) {
         $id = $artist['id'];

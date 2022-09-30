@@ -56,8 +56,6 @@ $app->get('/customers/{customer_id}/invoices', function (Request $req, Response 
     return $res;
 });
 
-// FIXME: Will not actually work since the FK constraint does not cascade on
-// DELETE
 /**
  * Delete a specific customer using the customer id
  */
@@ -68,9 +66,33 @@ $app->delete('/customers/{customer_id}', function (Request $req, Response $res, 
         throw new HttpBadRequestException($req, 'Invalid customer_id parameter!');
     }
 
+    // Needs to delete from child rows from other tables (InvoiceLine + Invoice)
+    // first since said tables + customer do not cascade delete
+    $db->begin_transaction();
+
+    $stmt = $db->prepare(
+        'DELETE il ' .
+            'FROM invoiceline as il JOIN invoice as i ON il.InvoiceId = i.InvoiceId ' .
+            'JOIN customer as c ON i.CustomerId = c.CustomerId ' .
+            'WHERE c.CustomerId = ?'
+    );
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+
+    $stmt = $db->prepare(
+        'DELETE i ' .
+        'FROM invoice as i JOIN customer as c ON i.CustomerId = c.CustomerId ' .
+        'WHERE c.CustomerId = ?'
+    );
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+
     $stmt = $db->prepare('DELETE FROM customer WHERE CustomerId = ?');
     $stmt->bind_param('i', $id);
-    if (!$stmt->execute()) {
+    $stmt->execute();
+
+    $stmt->close();
+    if (!$db->commit()) {
         throw new HttpInternalServerErrorException($req, 'Something broke!');
     }
 
