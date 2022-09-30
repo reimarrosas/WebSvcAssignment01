@@ -7,16 +7,30 @@ use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 
 require __DIR__ . '/vendor/autoload.php';
 
+require_once './HttpNotAcceptable.php';
+
 $app = AppFactory::create();
 
-$app->add(function (Request $req, RequestHandler $handler) {
-    $res = $handler->handle($req);
-
-    return $res->withHeader('content-type', 'application/json');
-});
 $app->addBodyParsingMiddleware();
 $app->addRoutingMiddleware();
-$app->addErrorMiddleware(true, true, true);
+
+// Middleware for handling specified Accept Headers.
+// If Accept Header is not empty and does not contain 'application/json', throw
+// an HttpNotAcceptableException, otherwise, handle the request and return the
+// response with Content-Type Header 'application/json'
+$app->add(function (Request $req, RequestHandler $handler) {
+    $accept = $req->getHeader('accept')[0];
+
+    if (strpos($accept, 'application/json') === false && strpos($accept, '*/*') === false) {
+        throw new HttpNotAcceptableException($req, "Cannot handle Accept Header: $accept");
+    }
+
+    $res = $handler->handle($req);
+    return $res->withAddedHeader('Content-Type', 'application/json');
+});
+
+$error_middleware = $app->addErrorMiddleware(true, true, true);
+$error_middleware->getDefaultErrorHandler()->forceContentType('application/json');
 
 $app->setBasePath("/music-api");
 
