@@ -4,10 +4,13 @@ use Slim\Factory\AppFactory;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
+use Psr\Log\LoggerInterface;
+use Slim\Exception\HttpSpecializedException;
 
 require __DIR__ . '/vendor/autoload.php';
 
-require_once './HttpNotAcceptable.php';
+require_once './CustomHttpException/HttpNotAcceptable.php';
+require_once './CustomHttpException/HttpUnprocessableEntity.php';
 
 $app = AppFactory::create();
 
@@ -29,8 +32,24 @@ $app->add(function (Request $req, RequestHandler $handler) {
     return $res->withAddedHeader('Content-Type', 'application/json');
 });
 
+$custom_error_handler = function (
+    Request $req,
+    HttpSpecializedException $exception,
+    bool $displayErrorDetails,
+    bool $logErrors,
+    bool $logErrorDetails,
+    ?LoggerInterface $logger = null
+) use ($app) {
+    // $logger->error($exception->getMessage());
+    $payload = ['error' => $exception->getMessage()];
+    $response  = $app->getResponseFactory()->createResponse($exception->getCode());
+    $response->getBody()->write(json_encode($payload));
+    return $response;
+};
+
 $error_middleware = $app->addErrorMiddleware(true, true, true);
-$error_middleware->getDefaultErrorHandler()->forceContentType('application/json');
+$error_middleware->setDefaultErrorHandler($custom_error_handler);
+// $error_middleware->getDefaultErrorHandler()->forceContentType('application/json');
 
 $app->setBasePath("/music-api");
 

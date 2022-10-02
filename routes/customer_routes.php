@@ -2,7 +2,6 @@
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpInternalServerErrorException;
 
 /**
@@ -36,7 +35,7 @@ $app->get('/customers/{customer_id}/invoices', function (Request $req, Response 
     $id = intval($args['customer_id']);
 
     if ($id < 1) {
-        throw new HttpBadRequestException($req, 'Invalid customer_id parameter');
+        throw new HttpUnprocessableEntityException($req, 'Invalid customer_id parameter');
     }
 
     $stmt = $db->prepare(
@@ -63,7 +62,7 @@ $app->delete('/customers/{customer_id}', function (Request $req, Response $res, 
     $id = intval($args['customer_id']);
 
     if ($id < 1) {
-        throw new HttpBadRequestException($req, 'Invalid customer_id parameter!');
+        throw new HttpUnprocessableEntityException($req, 'Invalid customer_id parameter!');
     }
 
     // Needs to delete from child rows from other tables (InvoiceLine + Invoice)

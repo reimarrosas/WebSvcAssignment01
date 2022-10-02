@@ -23,7 +23,7 @@ $app->get('/artists/{artist_id}', function (Request $req, Response $res, $args) 
     $id = intval($args['artist_id']);
 
     if ($id < 1) {
-        throw new HttpBadRequestException($req, 'Invalid artist_id parameter!');
+        throw new HttpUnprocessableEntityException($req, 'Invalid artist_id parameter!');
     }
 
     $stmt = $db->prepare('SELECT * FROM artist WHERE ArtistId = ?');
@@ -49,7 +49,7 @@ $app->get('/artists/{artist_id}/albums', function (Request $req, Response $res, 
     $id = intval($args['artist_id']);
 
     if ($id < 1) {
-        throw new HttpBadRequestException($req, 'Invalid artist_id parameter');
+        throw new HttpUnprocessableEntityException($req, 'Invalid artist_id parameter');
     }
 
     $stmt = $db->prepare('SELECT AlbumId, Title FROM artist as r JOIN album as l ON r.ArtistId = l.ArtistId WHERE r.ArtistId = ?');
@@ -73,9 +73,9 @@ $app->get('/artists/{artist_id}/albums/{album_id}/tracks', function (Request $re
     $query_params = $req->getQueryParams();
 
     if ($artist_id < 1) {
-        throw new HttpBadRequestException($req, 'Invalid artist_id parameter!');
+        throw new HttpUnprocessableEntityException($req, 'Invalid artist_id parameter!');
     } else if ($album_id < 1) {
-        throw new HttpBadRequestException($req, 'Invalid album_id parameter!');
+        throw new HttpUnprocessableEntityException($req, 'Invalid album_id parameter!');
     }
 
     // Check if genre or mediaType query param exists
@@ -166,7 +166,7 @@ $app->post('/artists', function (Request $req, Response $res, $args) use ($db, $
     $parsedBody = parseArtistBody($body, $isNewArtistValid);
 
     if (!$parsedBody) {
-        throw new HttpBadRequestException($req, 'Invalid New Artist(s)!');
+        throw new HttpUnprocessableEntityException($req, 'Invalid New Artist(s)!');
     }
 
     // Since DB doesn't use autoincrement, need to get the last ArtistId
@@ -207,7 +207,7 @@ $app->put('/artists', function (Request $req, Response $res, $args) use ($db, $i
     $parsedBody = parseArtistBody($body, $isArtistValid);
 
     if (!$parsedBody) {
-        throw new HttpBadRequestException($req, 'Invalid Artist(s)!');
+        throw new HttpUnprocessableEntityException($req, 'Invalid Artist(s)!');
     }
 
     $stmt = $db->prepare('UPDATE artist SET Name = ? WHERE ArtistId = ?');
@@ -240,7 +240,7 @@ $app->delete('/artists/{artist_id}', function (Request $req, Response $res, $arg
     $id = intval($args['artist_id']);
 
     if ($id < 1) {
-        throw new HttpBadRequestException($req, 'Invalid artist_id parameter!');
+        throw new HttpUnprocessableEntityException($req, 'Invalid artist_id parameter!');
     }
 
     $stmt = $db->prepare('DELETE FROM artist WHERE ArtistId = ?');
