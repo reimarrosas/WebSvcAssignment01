@@ -13,15 +13,17 @@ $app->get('/customers', function (Request $req, Response $res, $args) use ($db) 
 
     $query = 'SELECT * FROM customer';
     $result = [];
-    if ($country) {
-        $stmt = $db->prepare($query . ' WHERE Country = ?');
-        $stmt->bind_param('s', $country);
-        if (!$stmt->execute()) {
-            throw new HttpInternalServerErrorException($req, 'Something broke!');
+    try {
+        if ($country) {
+            $stmt = $db->prepare($query . ' WHERE Country = ?');
+            $stmt->bind_param('s', $country);
+            $stmt->execute();
+            $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        } else {
+            $result = $db->query('SELECT * FROM customer')->fetch_all(MYSQLI_ASSOC);
         }
-        $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    } else {
-        $result = $db->query('SELECT * FROM customer')->fetch_all(MYSQLI_ASSOC);
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $res->getBody()->write(json_encode($result));
@@ -44,9 +46,11 @@ $app->get('/customers/{customer_id}/invoices', function (Request $req, Response 
             'JOIN track as t ON il.TrackId = t.TrackId JOIN mediatype as m ON t.MediaTypeId = m.MediaTypeId JOIN genre as g ON t.GenreId = g.GenreId ' .
             'WHERE c.CustomerId = ?'
     );
-    $stmt->bind_param('i', $id);
-    if (!$stmt->execute()) {
-        throw new HttpInternalServerErrorException($req, 'Something broke!');
+    try {
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -69,30 +73,33 @@ $app->delete('/customers/{customer_id}', function (Request $req, Response $res, 
     // first since said tables + customer do not cascade delete
     $db->begin_transaction();
 
-    $stmt = $db->prepare(
-        'DELETE il ' .
-            'FROM invoiceline as il JOIN invoice as i ON il.InvoiceId = i.InvoiceId ' .
-            'JOIN customer as c ON i.CustomerId = c.CustomerId ' .
-            'WHERE c.CustomerId = ?'
-    );
-    $stmt->bind_param('i', $id);
-    $stmt->execute();
+    try {
+        $stmt = $db->prepare(
+            'DELETE il ' .
+                'FROM invoiceline as il JOIN invoice as i ON il.InvoiceId = i.InvoiceId ' .
+                'JOIN customer as c ON i.CustomerId = c.CustomerId ' .
+                'WHERE c.CustomerId = ?'
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
 
-    $stmt = $db->prepare(
-        'DELETE i ' .
-        'FROM invoice as i JOIN customer as c ON i.CustomerId = c.CustomerId ' .
-        'WHERE c.CustomerId = ?'
-    );
-    $stmt->bind_param('i', $id);
-    $stmt->execute();
+        $stmt = $db->prepare(
+            'DELETE i ' .
+                'FROM invoice as i JOIN customer as c ON i.CustomerId = c.CustomerId ' .
+                'WHERE c.CustomerId = ?'
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
 
-    $stmt = $db->prepare('DELETE FROM customer WHERE CustomerId = ?');
-    $stmt->bind_param('i', $id);
-    $stmt->execute();
+        $stmt = $db->prepare('DELETE FROM customer WHERE CustomerId = ?');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
 
-    $stmt->close();
-    if (!$db->commit()) {
-        throw new HttpInternalServerErrorException($req, 'Something broke!');
+        $stmt->close();
+        $db->commit();
+    } catch (\Throwable $th) {
+        $db->rollback();
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $res->getBody()->write(json_encode([

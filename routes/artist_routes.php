@@ -10,10 +10,14 @@ use Slim\Exception\HttpNotFoundException;
  * GET all the artists 
  */
 $app->get('/artists', function (Request $req, Response $res, $args) use ($db) {
-    $rows = $db->query('SELECT * from artist')->fetch_all(MYSQLI_ASSOC);
-    $data = json_encode($rows);
-    $res->getBody()->write($data);
-    return $res;
+    try {
+        $rows = $db->query('SELECT * from artist')->fetch_all(MYSQLI_ASSOC);
+        $data = json_encode($rows);
+        $res->getBody()->write($data);
+        return $res;
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
+    }
 });
 
 /**
@@ -27,16 +31,14 @@ $app->get('/artists/{artist_id}', function (Request $req, Response $res, $args) 
     }
 
     $stmt = $db->prepare('SELECT * FROM artist WHERE ArtistId = ?');
-    $stmt->bind_param('i', $id);
-    if (!$stmt->execute()) {
-        throw new HttpInternalServerErrorException($req, 'Something broke!');
+    try {
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $result = $stmt->get_result()->fetch_assoc();
-
-    if (empty($result)) {
-        throw new HttpNotFoundException($req, "Artist $id not found!");
-    }
 
     $res->getBody()->write(json_encode($result));
     return $res;
@@ -53,9 +55,11 @@ $app->get('/artists/{artist_id}/albums', function (Request $req, Response $res, 
     }
 
     $stmt = $db->prepare('SELECT AlbumId, Title FROM artist as r JOIN album as l ON r.ArtistId = l.ArtistId WHERE r.ArtistId = ?');
-    $stmt->bind_param('i', $id);
-    if (!$stmt->execute()) {
-        throw new HttpInternalServerErrorException($req, 'Something broke!');
+    try {
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -103,9 +107,11 @@ $app->get('/artists/{artist_id}/albums/{album_id}/tracks', function (Request $re
     }
 
     $stmt = $db->prepare("$select $from $where");
-    $stmt->bind_param($types, ...$params);
-    if (!$stmt->execute()) {
-        throw new HttpInternalServerErrorException($req, 'Something broke!');
+    try {
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -186,10 +192,13 @@ $app->post('/artists', function (Request $req, Response $res, $args) use ($db, $
     }
 
     $stmt = $db->prepare("INSERT INTO artist (ArtistId, Name) VALUES $params");
-    // Unwrapping the associative array to just be an array of strings
-    $stmt->bind_param($types, ...(array_map(fn ($item) => $item['name'], $parsedBody)));
-    if (!$stmt->execute()) {
-        throw new HttpInternalServerErrorException($req, 'Something broke!');
+    try {
+        // Unwrapping the associative array to just be an array of strings
+        $artist_arr = array_map(fn ($item) => $item['name'], $parsedBody);
+        $stmt->bind_param($types, ...$artist_arr);
+        $stmt->execute();
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $res->getBody()->write(json_encode([
@@ -215,15 +224,18 @@ $app->put('/artists', function (Request $req, Response $res, $args) use ($db, $i
 
     // Uses a prepared statement to update multiple artists based on the body of
     // the request
-    $db->begin_transaction();
-    foreach ($parsedBody as $artist) {
-        $id = $artist['id'];
-        $name = $artist['name'];
-        $stmt->execute();
-    }
-    $stmt->close();
-    if (!$db->commit()) {
-        throw new HttpNotFoundException($req, 'Artist(s) does not exist!');
+    try {
+        $db->begin_transaction();
+        foreach ($parsedBody as $artist) {
+            $id = $artist['id'];
+            $name = $artist['name'];
+            $stmt->execute();
+        }
+        $stmt->close();
+        $db->commit();
+    } catch (\Throwable $th) {
+        $db->rollback();
+        throw new HttpNotFoundException($req, 'Artist(s) does not exist!', $th);
     }
 
     $res->getBody()->write(json_encode([
@@ -244,9 +256,11 @@ $app->delete('/artists/{artist_id}', function (Request $req, Response $res, $arg
     }
 
     $stmt = $db->prepare('DELETE FROM artist WHERE ArtistId = ?');
-    $stmt->bind_param('i', $id);
-    if (!$stmt->execute()) {
-        throw new HttpInternalServerErrorException($req, 'Something broke!');
+    try {
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+    } catch (\Throwable $th) {
+        throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
 
     $res->getBody()->write(json_encode([
