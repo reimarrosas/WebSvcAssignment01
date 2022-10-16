@@ -255,13 +255,53 @@ $app->delete('/artists/{artist_id}', function (Request $req, Response $res, $arg
         throw new HttpUnprocessableEntityException($req, 'Invalid artist_id parameter!');
     }
 
-    $stmt = $db->prepare('DELETE FROM artist WHERE ArtistId = ?');
     try {
+        $db->begin_transaction();
+        $stmt = $db->prepare(
+            'DELETE pt ' .
+                'FROM PlaylistTrack as pt JOIN Track as t ON pt.TrackId = t.TrackId ' .
+                'JOIN Album as al ON t.AlbumId = al.AlbumId ' .
+                'JOIN Artist as a ON al.ArtistId = a.ArtistId ' .
+                'WHERE a.ArtistId = ?'
+        );
         $stmt->bind_param('i', $id);
         $stmt->execute();
+
+        $stmt = $db->prepare(
+            'DELETE t ' .
+                'FROM Track as t JOIN Album as al ON t.AlbumId = al.AlbumId ' .
+                'JOIN Artist as a ON al.ArtistId = a.ArtistId ' .
+                'WHERE a.ArtistId = ?'
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+
+        $stmt = $db->prepare(
+            'DELETE al ' .
+                'FROM Album as al JOIN Artist as a ON al.ArtistId = a.ArtistId ' .
+                'WHERE a.ArtistId = ?'
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+
+        $stmt = $db->prepare('DELETE FROM Artist WHERE ArtistId = ?');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+
+        $stmt->close();
+        $db->commit();
     } catch (\Throwable $th) {
+        $db->rollback();
         throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
     }
+
+    // $stmt = $db->prepare('DELETE FROM artist WHERE ArtistId = ?');
+    // try {
+    // $stmt->bind_param('i', $id);
+    // $stmt->execute();
+    // } catch (\Throwable $th) {
+    // throw new HttpInternalServerErrorException($req, 'Something broke!', $th);
+    // }
 
     $res->getBody()->write(json_encode([
         'message' => "Artist {$id} successfully deleted!"

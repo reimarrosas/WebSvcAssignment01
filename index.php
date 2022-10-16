@@ -32,24 +32,24 @@ $app->add(function (Request $req, RequestHandler $handler) {
     return $res->withAddedHeader('Content-Type', 'application/json');
 });
 
-$custom_error_handler = function (
-    Request $req,
-    HttpSpecializedException $exception,
-    bool $displayErrorDetails,
-    bool $logErrors,
-    bool $logErrorDetails,
-    ?LoggerInterface $logger = null
-) use ($app) {
-    // $logger->error($exception->getMessage());
-    $payload = ['error' => $exception->getMessage()];
-    $response  = $app->getResponseFactory()->createResponse($exception->getCode());
-    $response->getBody()->write(json_encode($payload));
-    return $response;
-};
+// $custom_error_handler = function (
+//     Request $req,
+//     HttpSpecializedException $exception,
+//     bool $displayErrorDetails,
+//     bool $logErrors,
+//     bool $logErrorDetails,
+//     ?LoggerInterface $logger = null
+// ) use ($app) {
+//     // $logger->error($exception->getMessage());
+//     $payload = ['error' => $exception->getMessage()];
+//     $response  = $app->getResponseFactory()->createResponse($exception->getCode());
+//     $response->getBody()->write(json_encode($payload));
+//     return $response;
+// };
 
 $error_middleware = $app->addErrorMiddleware(true, true, true);
-$error_middleware->setDefaultErrorHandler($custom_error_handler);
-// $error_middleware->getDefaultErrorHandler()->forceContentType('application/json');
+// $error_middleware->setDefaultErrorHandler($custom_error_handler);
+$error_middleware->getDefaultErrorHandler()->forceContentType('application/json');
 
 $app->setBasePath("/music-api");
 
